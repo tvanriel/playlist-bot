@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+		"type": "go",
+		"request": "launch",
+		"name": "debug web",
+		"program": "${workspaceFolder} web"
+	},
+        {
+		"type": "go",
+		"request": "launch",
+		"name": "debug discord",
+		"program": "${workspaceFolder} discord"
+	}
+    ]
+}
+

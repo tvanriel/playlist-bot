@@ -1,0 +1,25 @@
+version: '3.1'
+
+services:
+        mysql:
+                image: mariadb
+                ports:
+                        - 0.0.0.0:3306:3306
+                environment:
+                        MYSQL_ROOT_PASSWORD: root
+
+        minio:
+                image: bitnami/minio
+                ports:
+                        - 0.0.0.0:9000:9000
+                        - 0.0.0.0:9001:9001
+                environment:
+                        MINIO_ROOT_USER: theadminuser
+                        MINIO_ROOT_PASSWORD: theadminuser
+                        MINIO_DEFAULT_BUCKETS: sounds:public
+                        MINIO_SKIP_CLIENT: yes
+        rabbitmq:
+                image: rabbitmq:3-management
+                ports:
+                        - 0.0.0.0:5672:5672
+                        - 0.0.0.0:15672:15672

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+        <head>
+                <title></title>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1">
+                <link href="app/css/bootstrap.min.css" rel="stylesheet">
+                <link href="app/css/style.css" rel="stylesheet">
+                <script src="app/js/hx.min.js"></script>
+                <script src="app/js/hx-ws-ext.min.js"></script>
+                <script src="app/js/app.js"></script>
+        </head>
+        <body>
+                <h1>Playlist-bot</h1>
+                {{- range $guild := .Guilds}}
+                        <button class="btn btn-primary" hx-get="player/{{$guild.Snowflake}}" hx-target="#player">
+                                <img src="{{ $guild.Icon }}" alt="{{ $guild.Name }}"> {{ $guild.Name}}
+                        </button>
+                {{- end }}
+
+
+                <div id="player">
+
+        
+                </div>
+        
+        </body>
+</html>

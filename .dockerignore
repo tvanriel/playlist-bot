@@ -1,2 +1,4 @@
 assets
+config.yaml
 cmd/discord/config.yaml
+.kube
