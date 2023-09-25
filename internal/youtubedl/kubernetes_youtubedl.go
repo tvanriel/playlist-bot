@@ -54,6 +54,11 @@ func convertJob(url, guildId, uuid string) *batchv1.Job {
 		},
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
+                                ObjectMeta: metav1.ObjectMeta{
+                                        Labels: map[string]string{
+                                                "app": "playlist-bot-downloader",
+                                        },
+                                },
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
@@ -92,6 +97,21 @@ func convertJob(url, guildId, uuid string) *batchv1.Job {
 							},
 						},
 					},
+                                        // Make sure only one can run at a time.  To avoid throttling the CPU too far. 
+                                        Affinity: &v1.Affinity{
+                                                PodAntiAffinity: &v1.PodAntiAffinity{
+                                                        RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+                                                                {
+                                                                        LabelSelector: &metav1.LabelSelector{
+                                                                                MatchLabels: map[string]string{
+                                                                                        "app": "playlist-bot-downloader",
+                                                                                },
+                                                                        },
+                                                                        TopologyKey: "kubernetes.io/hostname",
+                                                                },
+                                                        },
+                                                },
+                                        },
 					RestartPolicy: v1.RestartPolicyOnFailure,
 				},
 			},
