@@ -23,6 +23,7 @@ import (
 	"github.com/mitaka8/playlist-bot/app"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+	"go.uber.org/multierr"
 )
 
 var cfgFile string
@@ -39,9 +40,6 @@ This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
-	Run: func(cmd *cobra.Command, args []string) {
-		app.Web()
-	},
 }
 var discordbotCmd = &cobra.Command{
 	Use: "discord",
@@ -57,9 +55,17 @@ var webCmd = &cobra.Command{
 }
 
 var saveCmd = &cobra.Command{
-	Use: "save <url> <guild> <uuid>",
+	Use: "save <-p playlist> <-g guildId> <-u url>",
+
 	Run: func(cmd *cobra.Command, args []string) {
-		app.Save(args[0], args[1], args[2])
+		url, uerr := cmd.Flags().GetString("url")
+		playlist, perr := cmd.Flags().GetString("playlist")
+		guild, gerr := cmd.Flags().GetString("guild")
+
+		if multierr.Combine(uerr, gerr, perr) != nil {
+			os.Exit(1)
+		}
+		app.Save(url, guild, playlist)
 	},
 }
 
@@ -76,6 +82,13 @@ func init() {
 	cobra.OnInitialize(initConfig)
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.playlist-bot.yaml)")
+
+	saveCmd.Flags().StringP("playlist", "p", "", "Playlist name to insert in")
+	saveCmd.Flags().StringP("guild", "g", "", "Guild to download for")
+	saveCmd.Flags().StringP("url", "u", "", "URL to download")
+	saveCmd.MarkFlagRequired("playlist")
+	saveCmd.MarkFlagRequired("guild")
+	saveCmd.MarkFlagRequired("url")
 
 	rootCmd.AddCommand(discordbotCmd, webCmd, saveCmd)
 

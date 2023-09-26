@@ -1,6 +1,6 @@
 .PHONY: docker
 docker:
-	docker buildx build --builder mybuilder --no-cache --push --platform linux/amd64,linux/arm64 --no-cache -t mitaka8/playlist-bot:latest .
+	docker buildx build --builder mybuilder --push --platform linux/amd64,linux/arm64 -t mitaka8/playlist-bot:latest .
 
 .PHONY: publish
 publish:

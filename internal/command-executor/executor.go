@@ -1,9 +1,11 @@
 package executor
 
 import (
-	"github.com/bwmarrin/discordgo"
-	"go.uber.org/zap"
 	"strings"
+
+	"github.com/bwmarrin/discordgo"
+	"go.uber.org/fx"
+	"go.uber.org/zap"
 )
 
 type Executor struct {
@@ -11,10 +13,17 @@ type Executor struct {
 	log      *zap.Logger
 }
 
-func NewCommandExecutor(commands []Command, log *zap.Logger) *Executor {
+type NewExecutorParams struct {
+        fx.In
+        Commands []Command `group:"commands"`
+	Log      *zap.Logger
+
+}
+
+func NewCommandExecutor(p NewExecutorParams) *Executor {
 	return &Executor{
-		commands: commands,
-		log:      log,
+		commands: p.Commands,
+		log:      p.Log.Named("executor"),
 	}
 }
 func (e *Executor) HasMatch(trigger string, message string) bool {

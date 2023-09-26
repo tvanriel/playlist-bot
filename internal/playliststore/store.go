@@ -116,10 +116,9 @@ func (p *PlaylistStore) RandomTrack(playlistId uint) (*TrackModel, error) {
 	return t, err
 }
 
-
 func (p *PlaylistStore) FindByID(id uint) (*PlaylistModel, error) {
-        
+
 	playlist := new(PlaylistModel)
-        err := tryQuery(p.mysql.Where("id = ?", id).Find(playlist))
-        return playlist, err
+	err := tryQuery(p.mysql.Where("id = ?", id).Find(playlist))
+	return playlist, err
 }

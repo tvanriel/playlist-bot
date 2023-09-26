@@ -35,7 +35,7 @@ type GuildModel struct {
 func NewGuildRepository(p NewGuildStoreParams) *GuildRepository {
 	return &GuildRepository{
 		Db:  p.Db,
-		Log: p.Log,
+		Log: p.Log.Named("guildstore"),
 	}
 }
 

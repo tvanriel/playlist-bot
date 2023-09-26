@@ -2,11 +2,12 @@ package player
 
 import (
 	"encoding/binary"
-	"fmt"
 	"io"
+
+	"go.uber.org/zap"
 )
 
-func loadSound(reader io.ReadCloser) ([][]byte, error) {
+func loadSound(log *zap.Logger, reader io.ReadCloser) ([][]byte, error) {
 	var buffer = make([][]byte, 0)
 
 	var opuslen int16
@@ -26,7 +27,7 @@ func loadSound(reader io.ReadCloser) ([][]byte, error) {
 		}
 
 		if err != nil {
-			fmt.Println("Error reading from dca reader :", err)
+                        log.Error("Error reading from dca reader", zap.Error(err))
 			return nil, err
 		}
 
@@ -36,7 +37,7 @@ func loadSound(reader io.ReadCloser) ([][]byte, error) {
 
 		// Should not be any end of reader errors
 		if err != nil {
-			fmt.Println("Error reading from dca reader :", err)
+                        log.Error("Error reading from dca reader", zap.Error(err))
 			return nil, err
 		}
 

@@ -24,7 +24,7 @@ type NewDiscordBotParams struct {
 func NewDiscordBot(p NewDiscordBotParams) *DiscordBot {
 	return &DiscordBot{
 		botToken: p.Config.BotToken,
-		log:      p.Log,
+		log:      p.Log.Named("discord"),
 		ready:    false,
 		exe:      p.Exe,
 		repo:     p.Repo,

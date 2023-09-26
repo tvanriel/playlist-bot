@@ -25,17 +25,17 @@ type NewWebInterfaceParams struct {
 	Templates       *Templater
 	ProgressTracker *progresstracker.ProgressTracker
 	MusicStore      *musicstore.MusicStore
-        PlaylistStore *playliststore.PlaylistStore
+	PlaylistStore   *playliststore.PlaylistStore
 }
 
 func NewWebInterface(p NewWebInterfaceParams) *WebInterface {
 	return &WebInterface{
-		Log:             p.Log,
+		Log:             p.Log.Named("web"),
 		GuildRepository: p.GuildRepository,
 		templates:       p.Templates,
 		ProgressTracker: p.ProgressTracker,
 		MusicStore:      p.MusicStore,
-                PlaylistStore: p.PlaylistStore,
+		PlaylistStore:   p.PlaylistStore,
 	}
 }
 
@@ -46,9 +46,9 @@ type WebInterface struct {
 	Log             *zap.Logger
 	templates       *Templater
 	ProgressTracker *progresstracker.ProgressTracker
-        PlaylistStore *playliststore.PlaylistStore
+	PlaylistStore   *playliststore.PlaylistStore
 
-	MusicStore      *musicstore.MusicStore
+	MusicStore *musicstore.MusicStore
 }
 
 func (w *WebInterface) ApiGroup() string { return "" }
@@ -96,14 +96,14 @@ func (w *WebInterface) Handler(e *echo.Group) {
 					return
 				}
 
-                                playlistId, err := w.GuildRepository.GetPlaying(guildId)
-                                if err != nil {
-                                        return
-                                }
-                                playlist, err := w.PlaylistStore.FindByID(playlistId)
-                                if err != nil {
-                                        return
-                                }
+				playlistId, err := w.GuildRepository.GetPlaying(guildId)
+				if err != nil {
+					return
+				}
+				playlist, err := w.PlaylistStore.FindByID(playlistId)
+				if err != nil {
+					return
+				}
 
 				err = w.templates.Templates.Lookup("progress.tpl.html").Execute(buf, progressHtmlParams{
 					Track:              t.Name,

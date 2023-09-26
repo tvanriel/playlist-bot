@@ -1,103 +1,152 @@
 package youtubedl
 
 import (
-	_ "golang.org/x/image/webp"
+	"errors"
 	"image"
 	"image/jpeg"
 	_ "image/jpeg"
 	"net/http"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 
+	_ "golang.org/x/image/webp"
+
 	"github.com/disintegration/imaging"
+	"github.com/google/uuid"
+	"github.com/kkdai/youtube/v2"
 	"github.com/minio/minio-go/v7"
 	"github.com/mitaka8/playlist-bot/internal/musicstore"
+	"github.com/mitaka8/playlist-bot/internal/playliststore"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 )
+
+var playlistRegex = regexp.MustCompile(`^https://(www\.?)(youtube\..+)/playlist\?list=[a-zA-Z0-9_-]+$`)
+var videoRegex = regexp.MustCompile(`^https://(www\.?)(youtube.+)/watch\?v=[a-zA-Z0-9_-]+`)
 
 type ExecYouTubeDL struct {
 	Configuration Configuration
 	S3            *minio.Client
 	MusicStore    *musicstore.MusicStore
 	Log           *zap.Logger
+	PlaylistStore *playliststore.PlaylistStore
 }
 
-func (e *ExecYouTubeDL) Save(source string, guildId string, uuid string) {
-	e.Log.Info("downloading",
+func (e *ExecYouTubeDL) Save(p YouTubeDLParams) error {
+	if isPlaylist(p) {
+		return e.downloadPlaylist(p)
+	} else if isVideo(p) {
+		return e.downloadVideo(p)
+	} else {
+		err := errors.New("Cannot detect URL type")
+		e.Log.Error(err.Error(), p.ZapFields()...)
+		return err
+
+	}
+}
+
+func isPlaylist(p YouTubeDLParams) bool {
+	return playlistRegex.MatchString(p.Source)
+}
+
+func isVideo(p YouTubeDLParams) bool {
+	return videoRegex.MatchString(p.Source)
+}
+
+func (e *ExecYouTubeDL) downloadVideo(p YouTubeDLParams) error {
+	return e.download(p.Source, p.GuildID, p.PlaylistName)
+}
+
+func (e *ExecYouTubeDL) downloadPlaylist(p YouTubeDLParams) error {
+	var err error
+
+	ytclient := youtube.Client{}
+	playlist, err := ytclient.GetPlaylist(p.Source)
+	if err != nil {
+		return err
+	}
+
+	for i := range playlist.Videos {
+		newErr := e.download(
+			idToUrl(playlist.Videos[i].ID),
+			p.GuildID,
+			p.PlaylistName,
+		)
+		err = multierr.Append(err, newErr)
+	}
+
+	return err
+}
+
+const TMPFILE_MP3 = "/tmp/audio.mp3"
+const TMPFILE_M4A = "/tmp/audio.m4a"
+const TMPFILE_DCA = "/tmp/audio.dca"
+const TMPFILE_ART = "/tmp/art.jpg"
+
+func (e *ExecYouTubeDL) download(source string, guildId string, playlistName string) error {
+	log := e.Log.With(
 		zap.String("source", source),
 		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
+		zap.String("playlistName", playlistName),
 	)
+
+	id, err := uuid.NewRandom()
+	if err != nil {
+		log.Warn("cannot create uuid")
+		return err
+	}
+
+	uuid := id.String()
+	log = log.With(zap.String("uuid", id.String()))
+
+	log.Info("downloading")
 
 	ytdl := ytdlCommand(source)
 	ffmpegmp3 := ffmpegmp3Command()
 
-	e.Log.Info("downloading youtube file",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("downloading youtube file")
 
 	output, err := ytdl.Output()
 	if err != nil {
-		e.Log.Error("cannot fetch youtube file", zap.Error(err), zap.String("output", string(output)))
-		return
+		log.Error("cannot fetch youtube file", zap.Error(err), zap.String("output", string(output)))
+		return err
 	}
-	e.Log.Info("convert to mp3",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("convert to mp3")
 
 	output, err = ffmpegmp3.Output()
 	if err != nil {
-		e.Log.Error("cannot convert to mp3", zap.Error(err), zap.String("output", string(output)))
-		return
+		log.Error("cannot convert to mp3", zap.Error(err), zap.String("output", string(output)))
+		return err
 	}
-	e.Log.Info("convert to dca",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("convert to dca")
 
 	err = convertToDca()
 	if err != nil {
-		e.Log.Error("cannot convert to dca", zap.Error(err))
-		return
+		log.Error("cannot convert to dca", zap.Error(err))
+		return err
 	}
-	e.Log.Info("fetch title",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("fetch title")
 
 	title, err := e.GetTitle(source)
 	if err != nil {
-		e.Log.Error("cannot fetch title", zap.Error(err))
-		return
+		log.Error("cannot fetch title", zap.Error(err))
+		return err
 	}
-	e.Log.Info("fetch author",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
 
+	log.Info("fetch author")
 	author, err := e.GetAuthor(source)
 	if err != nil {
-		e.Log.Error("cannot fetch author", zap.Error(err))
-		return
+		log.Error("cannot fetch author", zap.Error(err))
+		return err
 	}
-	e.Log.Info("fetch thumbnail url",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("fetch thumbnail url")
 
 	thumbnail, err := e.GetThumbnail(source)
 	if err != nil {
-		e.Log.Error("cannot fetch AlbumArt", zap.Error(err))
-		return
+		log.Error("cannot fetch AlbumArt", zap.Error(err))
+		return err
 	}
 	t := &musicstore.Track{
 		AlbumArt: thumbnail,
@@ -107,87 +156,63 @@ func (e *ExecYouTubeDL) Save(source string, guildId string, uuid string) {
 		GuildID:  guildId,
 		Uuid:     uuid,
 	}
-	e.Log.Info("downloading thumbnail file",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("downloading thumbnail file")
 
 	err = fetchThumbnail(thumbnail)
 	if err != nil {
-		e.Log.Error("Failed to download AlbumArt", zap.Error(err))
-		return
+		log.Error("Failed to download AlbumArt", zap.Error(err))
+		return err
 	}
-	e.Log.Info("uploading mp3 to bucket",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("uploading mp3 to bucket")
 
-	err = e.MusicStore.UploadMP3(t, "/tmp/audio.mp3")
+	err = e.MusicStore.UploadMP3(t, TMPFILE_MP3)
 	if err != nil {
-		e.Log.Error("Failed to upload mp3", zap.Error(err))
-		return
+		log.Error("Failed to upload mp3", zap.Error(err))
+		return err
 	}
-	e.Log.Info("uploading m4a to bucket",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("uploading m4a to bucket")
 
-	err = e.MusicStore.UploadM4A(t, "/tmp/audio.m4a")
+	err = e.MusicStore.UploadM4A(t, TMPFILE_M4A)
 	if err != nil {
-		e.Log.Error("Failed to upload m4a", zap.Error(err))
-		return
+		log.Error("Failed to upload m4a", zap.Error(err))
+		return err
 	}
-	e.Log.Info("uploading dca to bucket",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("uploading dca to bucket")
 
-	err = e.MusicStore.UploadDCA(t, "/tmp/audio.dca")
+	err = e.MusicStore.UploadDCA(t, TMPFILE_DCA)
 	if err != nil {
-		e.Log.Error("Failed to upload dca", zap.Error(err))
-		return
+		log.Error("Failed to upload dca", zap.Error(err))
+		return err
 	}
 
-	e.Log.Info("uploading albumart to bucket",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("uploading albumart to bucket")
 
-	err = e.MusicStore.UploadAlbumArt(t, "/tmp/art.jpg")
+	err = e.MusicStore.UploadAlbumArt(t, TMPFILE_ART)
 	if err != nil {
-		e.Log.Error("Failed to upload albumart", zap.Error(err))
-		return
+		log.Error("Failed to upload albumart", zap.Error(err))
 	}
 
-	e.Log.Info("uploading manifest to bucket",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
-	)
+	log.Info("uploading manifest to bucket")
 
 	err = e.MusicStore.Save(t)
 	if err != nil {
-		e.Log.Error("Failed to save track", zap.Error(err))
-		return
+		log.Error("Failed to save track", zap.Error(err))
+		return err
 	}
 
-	e.Log.Info("done",
-		zap.String("source", source),
-		zap.String("guildId", guildId),
-		zap.String("uuid", uuid),
+	log.Info("done")
+
+	err = multierr.Combine(
+		os.Remove(TMPFILE_M4A),
+		os.Remove(TMPFILE_MP3),
+		os.Remove(TMPFILE_DCA),
+		os.Remove(TMPFILE_ART),
 	)
+	if err != nil {
+		return err
+	}
 
-
-        os.Remove("/tmp/audio.m4a")
-        os.Remove("/tmp/audio.mp3")
-        os.Remove("/tmp/audio.dca")
-        os.Remove("/tmp/art.jpg")
-
+	return e.PlaylistStore.Append(guildId, playlistName, id.String())
 }
 
 func ffmpegmp3Command() *exec.Cmd {
@@ -195,8 +220,8 @@ func ffmpegmp3Command() *exec.Cmd {
 		"ffmpeg",
 		"-y",
 		"-i",
-		"/tmp/audio.m4a",
-		"/tmp/audio.mp3",
+		TMPFILE_M4A,
+		TMPFILE_MP3,
 	)
 }
 func ytdlCommand(source string) *exec.Cmd {
@@ -207,7 +232,7 @@ func ytdlCommand(source string) *exec.Cmd {
 		"-f",
 		"m4a",
 		"-o",
-		"/tmp/audio.m4a",
+		TMPFILE_M4A,
 		source,
 	)
 
@@ -270,8 +295,8 @@ func fetchThumbnail(source string) error {
 
 	cropped := imaging.Fill(im, 256, 256, imaging.Center, imaging.Lanczos)
 
-	os.Remove("/tmp/art.jpg")
-	f, err := os.Create("/tmp/art.jpg")
+	os.Remove(TMPFILE_ART)
+	f, err := os.Create(TMPFILE_ART)
 	if err != nil {
 		return err
 	}
@@ -286,11 +311,18 @@ func fetchThumbnail(source string) error {
 func convertToDca() error {
 	cmd := exec.Command(
 		"dca",
-		"/tmp/audio.m4a",
-		"/tmp/audio.dca",
+		TMPFILE_M4A,
+		TMPFILE_DCA,
 	)
 
 	err := cmd.Run()
 	return err
 
+}
+
+func idToUrl(id string) string {
+	return strings.Join([]string{
+		"https://youtube.com/watch?v=",
+		id,
+	}, "")
 }

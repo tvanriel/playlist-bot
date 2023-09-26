@@ -21,7 +21,7 @@ func NewProgressTracker(p NewProgressTrackerParams) *ProgressTracker {
 	return &ProgressTracker{
 		Amqp:     p.Amqp,
 		Progress: make(map[string]*Progress),
-		Log:      p.Log,
+		Log:      p.Log.Named("progress-tracker"),
 	}
 }
 
@@ -57,28 +57,26 @@ func (s *ProgressTracker) Consume(guildId string) (chan *Progress, error) {
 	if err != nil {
 		return nil, err
 	}
-	msgs, err := s.Ch.Consume("progress-"+guildId, "", true, false, false, true, nil)
 
 	out := make(chan *Progress)
 
 	if err == nil {
 		s.Log.Info("Consuming")
 		go func() {
-			for {
-				err := s.Connect()
+			msgs, err := s.Ch.Consume("progress-"+guildId, "", true, false, false, true, nil)
+			if err != nil {
+                                close(out)
+				s.Log.Error("cannot consume from channel", zap.Error(err))
+                                return
+			}
+			for m := range msgs {
+				message := &Progress{}
+				err := json.Unmarshal(m.Body, message)
 				if err != nil {
-					s.Log.Error("Cannot connect to AQMP", zap.Error(err))
+					s.Log.Error("cannot unmarshal message from queue", zap.Error(err))
 					continue
 				}
-				for m := range msgs {
-					message := &Progress{}
-					err := json.Unmarshal(m.Body, message)
-					if err != nil {
-						s.Log.Error("cannot unmarshal message from queue", zap.Error(err))
-						continue
-					}
-					out <- message
-				}
+				out <- message
 			}
 		}()
 	}
@@ -88,15 +86,18 @@ func (s *ProgressTracker) Consume(guildId string) (chan *Progress, error) {
 func (p *ProgressTracker) Publish() {
 	go func() {
 
+		err := p.Connect()
+		if err != nil {
+			p.Log.Fatal("cannot connect to Queue", zap.Error(err))
+		}
+
 		t := time.NewTicker(500 * time.Millisecond)
 		for range t.C {
-			err := p.Connect()
-			if err != nil {
-				p.Log.Error("cannot connect to Queue", zap.Error(err))
-				return
-			}
 			for guildId := range p.Progress {
 				_, err = p.Ch.QueueDeclare("progress-"+guildId, false, false, false, true, nil)
+                                if err != nil {
+                                        p.Log.Error("cannot declare queue", zap.String("guildId", guildId), zap.Error(err))
+                                }
 
 				body, err := json.Marshal(p.Progress[guildId])
 				if err != nil {

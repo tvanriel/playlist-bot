@@ -41,7 +41,7 @@ func NewPlayer(p NewPlayerParams) *Player {
 	return &Player{
 		PlaylistStore:   p.PlaylistStore,
 		MusicStore:      p.MusicStore,
-		Log:             p.Log,
+		Log:             p.Log.Named("player"),
 		GuildRepository: p.GuildRepository,
 		ProgressTracker: p.ProgressTracker,
 	}
@@ -49,27 +49,38 @@ func NewPlayer(p NewPlayerParams) *Player {
 
 func (p *Player) Connect(ses *discordgo.Session, guildId string) error {
 	conn, err := p.attemptConnect(ses, guildId)
+        log := p.Log.With(zap.String("guildId", guildId))
+
+        log.Info("Connecting to voicechannel")
 	if err != nil {
+                log.Warn("Cannot connect to voicechannel",
+                        zap.Error(err),
+                )
 		return err
 	}
 
-	p.Log.Info("Connected to voicechannel", zap.String("guild", guildId))
+	log.Info("Connected to voicechannel", zap.String("guild", guildId))
 
 	go func() {
 		for {
-
+                        log.Info("Playing a new track")
+                        log.Info("Selecting playlist")
 			playlist, err := p.GuildRepository.GetPlaying(guildId)
 			if err != nil {
-				p.Log.Warn("err while getting currently playing for guild",
-					zap.String("guildId", guildId),
+				log.Warn("err while getting currently playing for guild",
 					zap.Error(err),
 				)
 				time.Sleep(10 * time.Second)
 				continue
 			}
-			track, err := p.PlaylistStore.RandomTrack(playlist)
+                        log = log.With(zap.Uint("playlist", playlist))
+                        log.Info("Selected playlist")
+
+			
+                        log.Info("Selecting track")
+                        track, err := p.PlaylistStore.RandomTrack(playlist)
 			if err != nil {
-				p.Log.Warn("Error while attempting to select track", zap.Error(err), zap.String("guildId", guildId), zap.Uint("playlist", playlist))
+				p.Log.Warn("Error while attempting to select track", zap.Error(err))
 				time.Sleep(10 * time.Second)
 				continue
 			}
@@ -77,24 +88,24 @@ func (p *Player) Connect(ses *discordgo.Session, guildId string) error {
 				GuildID: guildId,
 				Uuid:    track.Uuid,
 			}
+                        log = log.With(zap.String("track", track.Uuid))
+                        log.Info("Selected track")
+
+                        log.Info("Fetching DCA file")
 			reader, err := p.MusicStore.GetDCA(t)
 			if err != nil {
-				p.Log.Warn("err while fetching track",
-					zap.String("guildId", guildId),
+				log.Warn("err while fetching DCA",
 					zap.Error(err),
-					zap.Uint("playlistId", playlist),
 				)
 				time.Sleep(10 * time.Second)
 				continue
 			}
 
-			buf, err := loadSound(reader)
+                        log.Info("Decoding DCA to OGG frames")
+                        buf, err := loadSound(log, reader)
 			if err != nil {
-	                        p.Log.Warn("err from dca reader",
-					zap.String("guildId", guildId),
+				log.Warn("err from dca reader",
 					zap.Error(err),
-					zap.Uint("playlistId", playlist),
-					zap.Uint("trackId", track.ID),
 				)
 				time.Sleep(10 * time.Second)
 				continue
@@ -105,6 +116,8 @@ func (p *Player) Connect(ses *discordgo.Session, guildId string) error {
 				continue
 			}
 			m := len(buf)
+                        log.Info("Playing track to Discord", zap.Int("frames", m))
+
 			for i := range buf {
 				p.ProgressTracker.Report(&progresstracker.Progress{
 					Current: i,
@@ -113,6 +126,14 @@ func (p *Player) Connect(ses *discordgo.Session, guildId string) error {
 				}, guildId)
 				conn.OpusSend <- buf[i]
 			}
+
+                        log.Info("Finished playing track.")
+				p.ProgressTracker.Report(&progresstracker.Progress{
+					Current: 1,
+					Max:     1,
+					Track:   track.Uuid,
+				}, guildId)
+
 			_ = conn.Speaking(false)
 
 		}

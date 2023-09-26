@@ -32,15 +32,16 @@ func NewKubernetesYouTubeDL(p NewKubernetesYouTubeDLParams) *KubernetesYouTubeDL
 	}
 }
 
-func (e *KubernetesYouTubeDL) Save(source string, guildId string, uuid string) {
-	err := e.Kubernetes.RunJob(convertJob(source, guildId, uuid))
+func (e *KubernetesYouTubeDL) Save(p YouTubeDLParams) error {
+	err := e.Kubernetes.RunJob(convertJob(p.Source, p.GuildID, p.PlaylistName))
 	if err != nil {
 		e.Log.Error("Error running job on Kubernetes", zap.Error(err))
 	}
+	return err
 
 }
 
-func convertJob(url, guildId, uuid string) *batchv1.Job {
+func convertJob(url, guildId, playlistName string) *batchv1.Job {
 
 	id := randstr.Concat(
 		randstr.Randstr(randstr.Lowercase, 1),
@@ -54,11 +55,16 @@ func convertJob(url, guildId, uuid string) *batchv1.Job {
 		},
 		Spec: batchv1.JobSpec{
 			Template: v1.PodTemplateSpec{
-                                ObjectMeta: metav1.ObjectMeta{
-                                        Labels: map[string]string{
-                                                "app": "playlist-bot-downloader",
-                                        },
-                                },
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+                                                "app.kubernetes.io/part-of": "playlist-bot",
+                                                "app.kubernetes.io/name": "playlist-bot",
+                                                "app.kubernetes.io/version": "latest",
+                                                "app.kubernetes.io/component": "downloader",
+                                                "app.kubernetes.io/instance": "downloader-" + id,
+						"app": "playlist-bot-downloader",
+					},
+				},
 				Spec: v1.PodSpec{
 					Containers: []v1.Container{
 						{
@@ -67,9 +73,9 @@ func convertJob(url, guildId, uuid string) *batchv1.Job {
 							Command: []string{
 								"playlist-bot",
 								"save",
-								url,
-								guildId,
-								uuid,
+								"-u", url,
+								"-g", guildId,
+								"-p", playlistName,
 							},
 							Env: []v1.EnvVar{
 								{
@@ -97,21 +103,21 @@ func convertJob(url, guildId, uuid string) *batchv1.Job {
 							},
 						},
 					},
-                                        // Make sure only one can run at a time.  To avoid throttling the CPU too far. 
-                                        Affinity: &v1.Affinity{
-                                                PodAntiAffinity: &v1.PodAntiAffinity{
-                                                        RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
-                                                                {
-                                                                        LabelSelector: &metav1.LabelSelector{
-                                                                                MatchLabels: map[string]string{
-                                                                                        "app": "playlist-bot-downloader",
-                                                                                },
-                                                                        },
-                                                                        TopologyKey: "kubernetes.io/hostname",
-                                                                },
-                                                        },
-                                                },
-                                        },
+					// Make sure only one can run at a time.  To avoid throttling the CPU too far.
+					Affinity: &v1.Affinity{
+						PodAntiAffinity: &v1.PodAntiAffinity{
+							RequiredDuringSchedulingIgnoredDuringExecution: []v1.PodAffinityTerm{
+								{
+									LabelSelector: &metav1.LabelSelector{
+										MatchLabels: map[string]string{
+											"app": "playlist-bot-downloader",
+										},
+									},
+									TopologyKey: "kubernetes.io/hostname",
+								},
+							},
+						},
+					},
 					RestartPolicy: v1.RestartPolicyOnFailure,
 				},
 			},

@@ -35,7 +35,7 @@ func NewMusicStore(p NewMusicStoreParams) *MusicStore {
 	return &MusicStore{
 		S3:     p.S3,
 		Bucket: p.Config.Bucket,
-		Log:    p.Log,
+		Log:    p.Log.Named("musicstore"),
 	}
 }
 

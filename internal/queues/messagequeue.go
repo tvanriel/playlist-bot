@@ -35,7 +35,7 @@ type MessageQueueBody struct {
 func NewMessageQueue(p NewMessageQueueParams) *MessageQueue {
 	return &MessageQueue{
 		Conn: p.Amqp,
-		Log:  p.Log,
+		Log:  p.Log.Named("messagequeue"),
 	}
 }
 

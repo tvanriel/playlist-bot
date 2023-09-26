@@ -20,7 +20,7 @@ type NewListPlaylistCommandParams struct {
 
 func NewListPlaylistCommand(p NewListPlaylistCommandParams) *ListPlaylistCommand {
 	return &ListPlaylistCommand{
-		log:           p.Logging,
+		log:           p.Logging.Named("list-playlist"),
 		PlaylistStore: p.PlaylistStore,
 	}
 }
@@ -36,17 +36,18 @@ func (c *ListPlaylistCommand) SkipsPrefix() bool {
 }
 
 func (c *ListPlaylistCommand) Apply(ctx *executor.Context) error {
+        log := c.log.With(ctx.ZapFields()...)
 	if len(ctx.Args) != 1 {
 		_, err := ctx.Reply("you must provide at least 1 (one) argument to this function.")
 		return err
 
 	}
-	c.log.Info("Listing playlist",
-		zap.String("guildId", ctx.Message.GuildID),
+	log.Info("Listing playlist",
 		zap.String("name", ctx.Args[0]),
 	)
 	playlists, err := c.PlaylistStore.ListPlaylists(ctx.Message.GuildID)
 	if err != nil {
+                log.Error("Failed to list playlists", zap.Error(err))
 		return err
 	}
 

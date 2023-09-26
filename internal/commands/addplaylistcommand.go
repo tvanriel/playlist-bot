@@ -20,7 +20,7 @@ type NewAddPlaylistCommandParams struct {
 
 func NewAddPlaylistCommand(p NewAddPlaylistCommandParams) *AddPlaylistCommand {
 	return &AddPlaylistCommand{
-		log:           p.Logging,
+		log:           p.Logging.Named("add-playlist"),
 		PlaylistStore: p.PlaylistStore,
 	}
 }
@@ -45,8 +45,7 @@ func (c *AddPlaylistCommand) Apply(ctx *executor.Context) error {
 	name := ctx.Args[0]
 	guildId := ctx.Message.GuildID
 
-	c.log.Info("Adding playlist",
-		zap.String("guildId", guildId),
+	c.log.With(ctx.ZapFields()...).Info("Adding playlist",
 		zap.String("name", name),
 	)
 
