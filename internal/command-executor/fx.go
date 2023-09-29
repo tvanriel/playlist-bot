@@ -5,7 +5,7 @@ import "go.uber.org/fx"
 const GROUP_COMMANDS = `group:"commands"`
 
 var Module = fx.Module("command-executor",
-        fx.Provide(
+	fx.Provide(
 		NewCommandExecutor,
 	),
 )

@@ -27,7 +27,7 @@ func loadSound(log *zap.Logger, reader io.ReadCloser) ([][]byte, error) {
 		}
 
 		if err != nil {
-                        log.Error("Error reading from dca reader", zap.Error(err))
+			log.Error("Error reading from dca reader", zap.Error(err))
 			return nil, err
 		}
 
@@ -37,7 +37,7 @@ func loadSound(log *zap.Logger, reader io.ReadCloser) ([][]byte, error) {
 
 		// Should not be any end of reader errors
 		if err != nil {
-                        log.Error("Error reading from dca reader", zap.Error(err))
+			log.Error("Error reading from dca reader", zap.Error(err))
 			return nil, err
 		}
 

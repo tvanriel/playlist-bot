@@ -14,10 +14,9 @@ type Executor struct {
 }
 
 type NewExecutorParams struct {
-        fx.In
-        Commands []Command `group:"commands"`
+	fx.In
+	Commands []Command `group:"commands"`
 	Log      *zap.Logger
-
 }
 
 func NewCommandExecutor(p NewExecutorParams) *Executor {

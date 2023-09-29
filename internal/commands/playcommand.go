@@ -39,25 +39,25 @@ func (p *PlayCommand) Name() string {
 }
 func (p *PlayCommand) SkipsPrefix() bool { return false }
 func (p *PlayCommand) Apply(ctx *executor.Context) error {
-        log := p.Log.With(ctx.ZapFields()...)
+	log := p.Log.With(ctx.ZapFields()...)
 
-        log.Info("Play")
+	log.Info("Play")
 
 	if len(ctx.Args) != 1 {
 		ctx.Reply("See `list` for a list of playlists\nusage: play <name>")
 	}
 	playlist, err := p.PlaylistRepository.FindByGuildAndName(ctx.Message.GuildID, ctx.Args[0])
 	if err != nil {
-                log.Warn("Failed to find playlist", zap.Error(err))
+		log.Warn("Failed to find playlist", zap.Error(err))
 		return err
 	}
 	err = p.GuildRepository.SetPlaying(ctx.Message.GuildID, playlist.ID)
 	if err != nil {
-                log.Warn("Failed to set guild.currently_playing", zap.Error(err))
+		log.Warn("Failed to set guild.currently_playing", zap.Error(err))
 		return err
 	}
 
-        log.Warn("guild is now playing", zap.String("playlist", playlist.Name))
+	log.Warn("guild is now playing", zap.String("playlist", playlist.Name))
 	ctx.Reply(nowPlaying(playlist.Name))
 	return nil
 }

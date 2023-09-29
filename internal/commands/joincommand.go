@@ -35,23 +35,23 @@ func (j *JoinCommand) SkipsPrefix() bool {
 
 func (j *JoinCommand) Apply(ctx *executor.Context) error {
 
-        log := j.Log.With(ctx.ZapFields()...)
-        log.Info("Requested to Join Voicechannel")
+	log := j.Log.With(ctx.ZapFields()...)
+	log.Info("Requested to Join Voicechannel")
 	state, err := ctx.Session.State.VoiceState(ctx.Message.GuildID, ctx.Message.Author.ID)
 	if err != nil {
-                log.Warn("Error while requesting VoiceState data", zap.Error(err))
+		log.Warn("Error while requesting VoiceState data", zap.Error(err))
 		return err
 	}
 	if state.ChannelID == "" {
-                log.Info("Refusing to join voicechannel, user is not in a channel")
+		log.Info("Refusing to join voicechannel, user is not in a channel")
 		ctx.Reply("You must be in a voicechannel to do this.")
 		return nil
 	}
-        
+
 	_, err = ctx.Session.ChannelVoiceJoin(ctx.Message.GuildID, state.ChannelID, false, true)
 
 	if err != nil {
-                log.Error("Cannot join voicechannel", zap.String("voiceChannelId", state.ChannelID), zap.Error(err))
+		log.Error("Cannot join voicechannel", zap.String("voiceChannelId", state.ChannelID), zap.Error(err))
 		ctx.Reply(err.Error())
 		return err
 	}

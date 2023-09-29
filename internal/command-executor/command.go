@@ -21,17 +21,17 @@ type Context struct {
 	Args    []string
 	Session *discordgo.Session
 }
-func (c *Context) ZapFields() []zap.Field {
-        return []zap.Field{
-                zap.Strings("args", c.Args),
-                zap.String("guildId", c.Message.GuildID),
-                zap.String("channelId", c.Message.ChannelID),
-                zap.String("authorId", c.Message.Author.ID),
-                zap.String("messageId", c.Message.Author.ID),
-                zap.String("content", c.Content),
-                zap.String("authorName", c.Message.Author.Username),
 
-        }
+func (c *Context) ZapFields() []zap.Field {
+	return []zap.Field{
+		zap.Strings("args", c.Args),
+		zap.String("guildId", c.Message.GuildID),
+		zap.String("channelId", c.Message.ChannelID),
+		zap.String("authorId", c.Message.Author.ID),
+		zap.String("messageId", c.Message.Author.ID),
+		zap.String("content", c.Content),
+		zap.String("authorName", c.Message.Author.Username),
+	}
 }
 
 func (ctx *Context) Reply(s string) (*discordgo.Message, error) {

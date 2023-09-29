@@ -27,6 +27,11 @@ services:
                 ports:
                         - 0.0.0.0:5672:5672
                         - 0.0.0.0:15672:15672
+
+        redis:
+                image: redis:7
+                ports:
+                        - 0.0.0.0:6379:6379
 volumes:
         minio_data:
                 driver: local

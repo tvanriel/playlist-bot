@@ -36,7 +36,7 @@ func (c *ListPlaylistCommand) SkipsPrefix() bool {
 }
 
 func (c *ListPlaylistCommand) Apply(ctx *executor.Context) error {
-        log := c.log.With(ctx.ZapFields()...)
+	log := c.log.With(ctx.ZapFields()...)
 	if len(ctx.Args) != 1 {
 		_, err := ctx.Reply("you must provide at least 1 (one) argument to this function.")
 		return err
@@ -47,7 +47,7 @@ func (c *ListPlaylistCommand) Apply(ctx *executor.Context) error {
 	)
 	playlists, err := c.PlaylistStore.ListPlaylists(ctx.Message.GuildID)
 	if err != nil {
-                log.Error("Failed to list playlists", zap.Error(err))
+		log.Error("Failed to list playlists", zap.Error(err))
 		return err
 	}
 

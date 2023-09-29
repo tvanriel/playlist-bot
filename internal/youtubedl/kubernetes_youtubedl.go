@@ -57,12 +57,12 @@ func convertJob(url, guildId, playlistName string) *batchv1.Job {
 			Template: v1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{
-                                                "app.kubernetes.io/part-of": "playlist-bot",
-                                                "app.kubernetes.io/name": "playlist-bot",
-                                                "app.kubernetes.io/version": "latest",
-                                                "app.kubernetes.io/component": "downloader",
-                                                "app.kubernetes.io/instance": "downloader-" + id,
-						"app": "playlist-bot-downloader",
+						"app.kubernetes.io/part-of":   "playlist-bot",
+						"app.kubernetes.io/name":      "playlist-bot",
+						"app.kubernetes.io/version":   "latest",
+						"app.kubernetes.io/component": "downloader",
+						"app.kubernetes.io/instance":  "downloader-" + id,
+						"app":                         "playlist-bot-downloader",
 					},
 				},
 				Spec: v1.PodSpec{

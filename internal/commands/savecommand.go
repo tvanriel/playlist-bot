@@ -17,7 +17,7 @@ type NewSaveCommandParams struct {
 	MusicStore    *musicstore.MusicStore
 	YouTubeDL     youtubedl.YoutubeDL
 	PlaylistStore *playliststore.PlaylistStore
-        Log *zap.Logger
+	Log           *zap.Logger
 }
 
 func NewSaveCommand(p NewSaveCommandParams) *SaveCommand {
@@ -25,7 +25,7 @@ func NewSaveCommand(p NewSaveCommandParams) *SaveCommand {
 		MusicStore:    p.MusicStore,
 		YouTubeDL:     p.YouTubeDL,
 		PlaylistStore: p.PlaylistStore,
-                Log:           p.Log.Named("save"),
+		Log:           p.Log.Named("save"),
 	}
 }
 
@@ -33,7 +33,7 @@ type SaveCommand struct {
 	YouTubeDL     youtubedl.YoutubeDL
 	MusicStore    *musicstore.MusicStore
 	PlaylistStore *playliststore.PlaylistStore
-        Log *zap.Logger
+	Log           *zap.Logger
 }
 
 var _ executor.Command = &SaveCommand{}
@@ -47,7 +47,7 @@ func (s *SaveCommand) Name() string {
 }
 
 func (s *SaveCommand) Apply(ctx *executor.Context) error {
-        log := s.Log.With(ctx.ZapFields()...)
+	log := s.Log.With(ctx.ZapFields()...)
 	if len(ctx.Args) != 2 {
 		_, err := ctx.Reply("usage: save <playlist-name> <url>")
 		return err
@@ -57,7 +57,7 @@ func (s *SaveCommand) Apply(ctx *executor.Context) error {
 	exists, err := s.PlaylistStore.PlaylistExists(guildId, playlistName)
 
 	if err != nil {
-                log.Info("Saving...")
+		log.Info("Saving...")
 		return err
 	}
 
@@ -70,15 +70,15 @@ func (s *SaveCommand) Apply(ctx *executor.Context) error {
 
 	ctx.Reply("Saving...")
 
-        params := youtubedl.YouTubeDLParams{
+	params := youtubedl.YouTubeDLParams{
 		Source:       url,
 		GuildID:      guildId,
 		PlaylistName: playlistName,
 	}
-        log.With(params.ZapFields()...).Info("Saving...")
+	log.With(params.ZapFields()...).Info("Saving...")
 	err = s.YouTubeDL.Save(params)
 	if err != nil {
-                log.With(params.ZapFields()...).Error("Failed to save", )
+		log.With(params.ZapFields()...).Error("Failed to save")
 		ctx.Error(err)
 	}
 

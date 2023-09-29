@@ -82,12 +82,7 @@ func (w *WebInterface) Handler(e *echo.Group) {
 		websocket.Handler(func(ws *websocket.Conn) {
 			defer ws.Close()
 
-			ch, err := w.ProgressTracker.Consume(guildId)
-			if err != nil {
-				w.Log.Error("cannot listen for progress", zap.Error(err), zap.String("guildId", guildId))
-				ws.Close()
-				return
-			}
+			ch := w.ProgressTracker.Consume(guildId)
 			for m := range ch {
 				buf := bytes.NewBufferString("")
 				progress := int64(float32(m.Current) / float32(m.Max) * 100.0)

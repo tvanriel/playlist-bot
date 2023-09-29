@@ -7,7 +7,7 @@ WORKDIR /usr/src/playlist-bot
 RUN --mount=type=cache,target=/go/pkg/mod \
       --mount=type=bind,source=go.mod,target=go.mod \
       --mount=type=bind,source=go.sum,target=go.sum \
-      go mod download -x
+      go get
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /usr/bin/playlist-bot .
 RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} go build -o /usr/bin/dca internal/dca/dca.go
 

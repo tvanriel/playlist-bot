@@ -12,6 +12,7 @@ import (
 	"github.com/tvanriel/cloudsdk/kubernetes"
 	"github.com/tvanriel/cloudsdk/logging"
 	"github.com/tvanriel/cloudsdk/mysql"
+	"github.com/tvanriel/cloudsdk/redis"
 	"github.com/tvanriel/cloudsdk/s3"
 )
 
@@ -25,6 +26,7 @@ type Configuration struct {
 	Discord    discord.Configuration    `mapstructure:"discord"`
 	YouTubeDL  youtubedl.Configuration  `mapstructure:"youtube"`
 	MusicStore musicstore.Configuration `mapstructure:"musicstore"`
+	Redis      redis.Configuration      `mapstructure:"redis"`
 }
 
 func ViperConfiguration() (*Configuration, error) {
@@ -81,4 +83,8 @@ func YoutubeDLConfiguration(config *Configuration) youtubedl.Configuration {
 
 func MusicStoreConfiguration(config *Configuration) *musicstore.Configuration {
 	return &config.MusicStore
+}
+func RedisConfiguration(config *Configuration) redis.Configuration {
+	return config.Redis
+
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/tvanriel/cloudsdk/kubernetes"
 	"github.com/tvanriel/cloudsdk/logging"
 	"github.com/tvanriel/cloudsdk/mysql"
+	"github.com/tvanriel/cloudsdk/redis"
 	"github.com/tvanriel/cloudsdk/s3"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
@@ -34,6 +35,7 @@ func DiscordBot() {
 			config.YoutubeDLConfiguration,
 			config.KubernetesConfiguration,
 			config.MusicStoreConfiguration,
+			config.RedisConfiguration,
 		),
 		logging.FXLogger(),
 		logging.Module,
@@ -50,6 +52,7 @@ func DiscordBot() {
 		musicstore.Module,
 		progresstracker.Module,
 		amqp.Module,
+		redis.Module,
 		fx.Invoke(progresstracker.StartReporting),
 	).Run()
 }
@@ -64,6 +67,7 @@ func Web() {
 			config.HttpConfiguration,
 			config.S3Configuration,
 			config.MusicStoreConfiguration,
+			config.RedisConfiguration,
 		),
 		logging.FXLogger(),
 		logging.Module,
@@ -75,6 +79,7 @@ func Web() {
 		amqp.Module,
 		playliststore.Module,
 
+		redis.Module,
 		s3.Module,
 		musicstore.Module,
 

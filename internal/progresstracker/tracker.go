@@ -3,33 +3,31 @@ package progresstracker
 import (
 	"context"
 	"encoding/json"
+	"github.com/tvanriel/cloudsdk/redis"
 	"time"
 
-	"github.com/rabbitmq/amqp091-go"
-	"github.com/tvanriel/cloudsdk/amqp"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
 
 type NewProgressTrackerParams struct {
 	fx.In
-	Amqp *amqp.Connection
-	Log  *zap.Logger
+	Log   *zap.Logger
+	Redis *redis.RedisClient
 }
 
 func NewProgressTracker(p NewProgressTrackerParams) *ProgressTracker {
 	return &ProgressTracker{
-		Amqp:     p.Amqp,
 		Progress: make(map[string]*Progress),
 		Log:      p.Log.Named("progress-tracker"),
+		Redis:    p.Redis,
 	}
 }
 
 type ProgressTracker struct {
-	Amqp     *amqp.Connection
-	Ch       *amqp.Channel
 	Progress map[string]*Progress
 	Log      *zap.Logger
+	Redis    *redis.RedisClient
 }
 
 type Progress struct {
@@ -38,67 +36,53 @@ type Progress struct {
 	Track   string
 }
 
-func (s *ProgressTracker) Connect() error {
-	err := s.Amqp.Reconnect()
-	if err != nil {
-		return err
-	}
-
-	s.Ch, err = s.Amqp.Channel()
-	return err
-}
-
-func (s *ProgressTracker) Consume(guildId string) (chan *Progress, error) {
-	err := s.Connect()
-	if err != nil {
-		return nil, err
-	}
-	_, err = s.Ch.QueueDeclare("progress-"+guildId, false, false, false, true, nil)
-	if err != nil {
-		return nil, err
-	}
+func (s *ProgressTracker) Consume(guildId string) chan *Progress {
 
 	out := make(chan *Progress)
 
-	if err == nil {
-		s.Log.Info("Consuming")
-		go func() {
-			msgs, err := s.Ch.Consume("progress-"+guildId, "", true, false, false, true, nil)
-			if err != nil {
-                                close(out)
-				s.Log.Error("cannot consume from channel", zap.Error(err))
-                                return
-			}
-			for m := range msgs {
-				message := &Progress{}
-				err := json.Unmarshal(m.Body, message)
-				if err != nil {
-					s.Log.Error("cannot unmarshal message from queue", zap.Error(err))
-					continue
-				}
-				out <- message
-			}
-		}()
+	go func() {
+		ticker := time.NewTicker(1 * time.Second)
+		s.getprogress(out, guildId)
+		for range ticker.C {
+			s.getprogress(out, guildId)
+		}
+
+	}()
+	return out
+}
+
+func (s *ProgressTracker) getprogress(out chan *Progress, guildId string) {
+	log := s.Log.With(zap.String("guildId", guildId))
+	key := "progress"
+	conn := s.Redis.Conn()
+	cmd := conn.Get(context.Background(), key+guildId)
+	err := cmd.Err()
+	if err != nil {
+		log.Error("Cannot fetch progress from redis", zap.Error(err))
+		return
 	}
-	return out, err
+
+	m, err := cmd.Bytes()
+	if err != nil {
+		log.Error("cannot get redis response as bytes", zap.Error(err))
+		return
+	}
+	message := &Progress{}
+	err = json.Unmarshal(m, message)
+	if err != nil {
+		s.Log.Error("cannot unmarshal message from redis", zap.Error(err))
+		return
+	}
+	out <- message
 }
 
 func (p *ProgressTracker) Publish() {
+	key := "progress"
+
 	go func() {
-
-		err := p.Connect()
-		if err != nil {
-			p.Log.Fatal("cannot connect to Queue", zap.Error(err))
-		}
-
 		t := time.NewTicker(500 * time.Millisecond)
 		for range t.C {
 			for guildId := range p.Progress {
-				_, err = p.Ch.QueueDeclare("progress-"+guildId, false, false, false, true, nil)
-                                if err != nil {
-                                        p.Log.Error("cannot declare queue", zap.String("guildId", guildId), zap.Error(err))
-                                }
-
 				body, err := json.Marshal(p.Progress[guildId])
 				if err != nil {
 					p.Log.Error("cannot Marshal progress",
@@ -108,17 +92,14 @@ func (p *ProgressTracker) Publish() {
 					break
 				}
 
-				err = p.Ch.PublishWithContext(
+				conn := p.Redis.Conn()
+				cmd := conn.Set(
 					context.Background(),
-					"",
-					"progress-"+guildId,
-					false,
-					false,
-					amqp091.Publishing{
-						Body: body,
-					},
+					key+guildId,
+					body,
+					time.Hour,
 				)
-				if err != nil {
+				if cmd.Err() != nil {
 					p.Log.Error("cannot publish progress",
 						zap.String("guildId", guildId),
 						zap.Error(err),
