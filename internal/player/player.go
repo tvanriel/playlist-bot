@@ -23,12 +23,20 @@ type NewPlayerParams struct {
 	ProgressTracker *progresstracker.ProgressTracker
 }
 
+type session struct {
+	index      int
+	tracks     []string
+	playlistId uint
+}
+
 type Player struct {
 	PlaylistStore   *playliststore.PlaylistStore
 	GuildRepository *guildstore.GuildRepository
 	MusicStore      *musicstore.MusicStore
 	Log             *zap.Logger
 	ProgressTracker *progresstracker.ProgressTracker
+
+	playlist map[string]*session
 }
 
 type Progress struct {
@@ -44,6 +52,7 @@ func NewPlayer(p NewPlayerParams) *Player {
 		Log:             p.Log.Named("player"),
 		GuildRepository: p.GuildRepository,
 		ProgressTracker: p.ProgressTracker,
+                playlist: make(map[string]*session),
 	}
 }
 
@@ -59,40 +68,26 @@ func (p *Player) Connect(ses *discordgo.Session, guildId string) error {
 		return err
 	}
 
-	log.Info("Connected to voicechannel", zap.String("guild", guildId))
-
 	go func() {
 		for {
-                        log := p.Log.With(zap.String("guildId", guildId), zap.String("channel", conn.ChannelID))
-			log.Info("Playing a new track")
-			log.Info("Selecting playlist")
-			playlist, err := p.GuildRepository.GetPlaying(guildId)
+			log = p.Log.With(zap.String("guild", guildId))
+			track, err := p.Next(guildId)
 			if err != nil {
-				log.Warn("err while getting currently playing for guild",
-					zap.Error(err),
-				)
+				log.Info("Failed to retrieve next track for guild")
 				time.Sleep(10 * time.Second)
-				continue
+                                continue
 			}
-			log = log.With(zap.Uint("playlist", playlist))
-			log.Info("Selected playlist")
+                        if track == nil {
+                                log.Info("Track is nil")
+                                time.Sleep(10 *time.Second)
+                                continue
+                        }
 
-			log.Info("Selecting track")
-			track, err := p.PlaylistStore.RandomTrack(playlist)
-			if err != nil {
-				p.Log.Warn("Error while attempting to select track", zap.Error(err))
-				time.Sleep(10 * time.Second)
-				continue
-			}
-			t := &musicstore.Track{
-				GuildID: guildId,
-				Uuid:    track.Uuid,
-			}
 			log = log.With(zap.String("track", track.Uuid))
 			log.Info("Selected track")
 
 			log.Info("Fetching DCA file")
-			reader, err := p.MusicStore.GetDCA(t)
+			reader, err := p.MusicStore.GetDCA(track)
 			if err != nil {
 				log.Warn("err while fetching DCA",
 					zap.Error(err),
@@ -160,4 +155,92 @@ func (p *Player) attemptConnect(ses *discordgo.Session, guildId string) (*discor
 	}
 	return ses.ChannelVoiceJoin(guildId, channelId, false, true)
 
+}
+func (p *Player) Next(guildId string) (*musicstore.Track, error) {
+	log := p.Log.With(zap.String("guildId", guildId))
+
+	// Fetch what is currently playing on this guild.
+	playlist, err := p.GuildRepository.GetPlaying(guildId)
+	if err != nil {
+		log.Warn("err while getting currently playing for guild",
+			zap.Error(err),
+		)
+		return nil, err
+	}
+	log = log.With(zap.Uint("playlist", playlist)) 
+
+        // get the session
+	ses, ok := p.playlist[guildId]
+	if !ok {
+                // Oh no, there is no session, create a new one.
+		err = p.NewSession(guildId, playlist)
+		if err != nil {
+			log.Warn("cannot create new play session for guild",
+				zap.Error(err),
+			)
+			return nil, err
+		}
+	        ses = p.playlist[guildId]
+
+	}
+
+        // Session playlist is not equal to whatever we want to play, create a new session.
+	if playlist != p.playlist[guildId].playlistId {
+		log.Info("playlist changed, updating session playlist")
+		err = p.NewSession(guildId, playlist)
+		if err != nil {
+			log.Warn("cannot create new play session for guild",
+				zap.Error(err),
+			)
+			return nil, err
+		}
+	}
+
+
+        // Is there anything in the tracks entry?
+        if len(ses.tracks) == 0 {
+                return nil, nil
+        }
+
+        // We reached the end of the session. 
+	if ses.index >= len(ses.tracks) {
+		ses.index = 0
+	}
+	track := ses.tracks[ses.index]
+	ses.index++
+	if err != nil {
+		p.Log.Warn("Error while attempting to select track", zap.Error(err))
+	}
+
+	return &musicstore.Track{
+		GuildID: guildId,
+		Uuid:    track,
+	}, nil
+
+}
+func (p *Player) NewSession(guildId string, playlist uint) error {
+	tracks, err := p.PlaylistStore.TrackIds(playlist)
+	if err != nil {
+		p.Log.Warn("cannot get trackIds from playlist",
+                        zap.String("guildId", guildId),
+                        zap.Uint("playlist", playlist),
+			zap.Error(err),
+		)
+		return err
+	}
+	p.playlist[guildId] = &session{
+		index:      0,
+		tracks:     tracks,
+		playlistId: playlist,
+	}
+
+        p.Log.Info("new session", 
+                        zap.String("guildId", guildId),
+                        zap.Uint("playlist", playlist),
+                        zap.Int("len(tracks)", len(tracks)),
+                        zap.Strings("tracks", tracks),
+
+
+        )
+	return nil
 }

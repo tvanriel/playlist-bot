@@ -104,6 +104,16 @@ func (p *PlaylistStore) Append(guildId, playlistName, id string) error {
 	return tryQuery(p.mysql.Save(t))
 
 }
+
+func (p *PlaylistStore) TrackIds(playlistId uint) (trackIds []string, err error) {
+	err = tryQuery(p.mysql.
+		Model(&TrackModel{}).
+		Order("RAND()").
+		Where("playlist_id = ?", playlistId).
+		Pluck("uuid", &trackIds),
+	)
+	return
+}
 func (p *PlaylistStore) RandomTrack(playlistId uint) (*TrackModel, error) {
 	t := &TrackModel{}
 	err := tryQuery(p.mysql.Order("RAND()").Where("playlist_id = ?", playlistId).Limit(1).Find(t))
