@@ -29,8 +29,9 @@ function update_trackname() {
         user=$3
         pass=$4
         uuid=$5
-        artist=$6
-        track=$7
+        artist=$(echo $6 | sed "s/'//g" | sed "s/\"//g")
+        track=$(echo $7 | sed "s/'//g" | sed "s/\"//g")
+
         /usr/bin/mycli -u "$user" -P "$port" -p "$pass" "$name" -e "UPDATE track_models set artist_name = '$artist', track_name = '$track' WHERE uuid = '$uuid' LIMIT 1;"
 }
 
