@@ -10,6 +10,7 @@ import (
 	"github.com/mitaka8/playlist-bot/internal/player"
 	"github.com/mitaka8/playlist-bot/internal/playliststore"
 	"github.com/mitaka8/playlist-bot/internal/progresstracker"
+	"github.com/mitaka8/playlist-bot/internal/requeststore"
 	"github.com/mitaka8/playlist-bot/internal/web"
 	"github.com/mitaka8/playlist-bot/internal/youtubedl"
 	"github.com/tvanriel/cloudsdk/amqp"
@@ -40,6 +41,7 @@ func DiscordBot() {
 		logging.FXLogger(),
 		logging.Module,
 		guildstore.Module,
+                requeststore.Module,
 		mysql.Module,
 		player.Module,
 		discord.Module,

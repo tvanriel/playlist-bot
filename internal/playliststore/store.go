@@ -139,6 +139,14 @@ func (p *PlaylistStore) FindByID(id uint) (*PlaylistModel, error) {
 	err := tryQuery(p.mysql.Where("id = ?", id).Find(playlist))
 	return playlist, err
 }
+
+func (p *PlaylistStore) FindTrack(id uint) (*TrackModel, error) {
+        t := new(TrackModel)
+        t.ID = id
+        err := tryQuery(p.mysql.Find(t))
+        return t, err
+}
+
 func (p *PlaylistStore) Search(guildId, term string) ([]TrackModel, error) {
         var playlists []uint
         err := tryQuery(p.mysql.Model(&PlaylistModel{}).Where("guild_id = ?", guildId).Pluck("id", &playlists))

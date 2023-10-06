@@ -9,6 +9,7 @@ import (
 	"github.com/mitaka8/playlist-bot/internal/musicstore"
 	"github.com/mitaka8/playlist-bot/internal/playliststore"
 	"github.com/mitaka8/playlist-bot/internal/progresstracker"
+	"github.com/mitaka8/playlist-bot/internal/requeststore"
 	"go.uber.org/fx"
 	"go.uber.org/zap"
 )
@@ -21,6 +22,7 @@ type NewPlayerParams struct {
 	GuildRepository *guildstore.GuildRepository
 	Log             *zap.Logger
 	ProgressTracker *progresstracker.ProgressTracker
+        Requests        *requeststore.RequestRepository
 }
 
 type session struct {
@@ -35,6 +37,7 @@ type Player struct {
 	MusicStore      *musicstore.MusicStore
 	Log             *zap.Logger
 	ProgressTracker *progresstracker.ProgressTracker
+        Requests        *requeststore.RequestRepository
 
 	playlist map[string]*session
 }
@@ -53,6 +56,7 @@ func NewPlayer(p NewPlayerParams) *Player {
 		GuildRepository: p.GuildRepository,
 		ProgressTracker: p.ProgressTracker,
                 playlist: make(map[string]*session),
+                Requests:        p.Requests,
 	}
 }
 
@@ -158,6 +162,28 @@ func (p *Player) attemptConnect(ses *discordgo.Session, guildId string) (*discor
 }
 func (p *Player) Next(guildId string) (*musicstore.Track, error) {
 	log := p.Log.With(zap.String("guildId", guildId))
+
+
+        l, err := p.Requests.Length(guildId)
+        if err != nil {
+                return nil, err
+        }
+        if l > 0 {
+                id, err := p.Requests.Pop(guildId)
+                if err != nil {
+                        return nil, err
+                }
+                track, err := p.PlaylistStore.FindTrack(id)
+                if err != nil {
+                        return nil, err
+                }
+                return &musicstore.Track{
+                        GuildID: guildId,
+                        Uuid: track.Uuid,
+                }, nil
+                
+                
+        }
 
 	// Fetch what is currently playing on this guild.
 	playlist, err := p.GuildRepository.GetPlaying(guildId)

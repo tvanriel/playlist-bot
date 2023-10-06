@@ -126,6 +126,7 @@ func (m *MusicStore) Find(guildId, uuid string) (*Track, error) {
 	return t, err
 }
 
+
 func (m *MusicStore) UploadMP3(t *Track, path string) error {
 	f, err := os.Open(path)
 	if err != nil {

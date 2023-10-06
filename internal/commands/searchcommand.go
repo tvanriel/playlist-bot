@@ -1,6 +1,8 @@
 package commands
 
 import (
+	"strings"
+
 	executor "github.com/mitaka8/playlist-bot/internal/command-executor"
 	"github.com/mitaka8/playlist-bot/internal/playliststore"
 	"go.uber.org/fx"
@@ -39,7 +41,7 @@ func (s *SearchCommand) Apply(context *executor.Context) error {
                 context.Reply("Usage: search <term>")
                 return nil
         }
-        term := context.Args[0]
+        term := strings.Join(context.Args, " ")
         guildId := context.Message.GuildID
 
         results, err := s.PlaylistStore.Search(guildId, term)
