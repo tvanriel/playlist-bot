@@ -90,7 +90,7 @@ func (ctx *Context) ReplyList(s []string) ([]*discordgo.Message, error) {
 
 	}
 
-	itemTpl := "`%s`\n"
+	itemTpl := "%s\n"
 	templated := make([]string, len(s))
 	for i := range s {
 		templated = append(templated, fmt.Sprintf(itemTpl, s[i]))

@@ -11,4 +11,5 @@ var Module = fx.Module("commands", fx.Provide(
 	executor.AsCommand(NewListPlaylistCommand),
 	executor.AsCommand(NewPlayCommand),
 	executor.AsCommand(NewSaveCommand),
+	executor.AsCommand(NewSearchCommand),
 ))

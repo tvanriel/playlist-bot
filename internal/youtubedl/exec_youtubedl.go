@@ -212,7 +212,7 @@ func (e *ExecYouTubeDL) download(source string, guildId string, playlistName str
 		return err
 	}
 
-	return e.PlaylistStore.Append(guildId, playlistName, id.String())
+	return e.PlaylistStore.Append(guildId, playlistName, id.String(), title, author)
 }
 
 func ffmpegmp3Command() *exec.Cmd {

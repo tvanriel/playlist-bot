@@ -2,6 +2,8 @@ package playliststore
 
 import (
 	"errors"
+	"strconv"
+	"strings"
 
 	"go.uber.org/fx"
 	"gorm.io/gorm"
@@ -21,6 +23,9 @@ type TrackModel struct {
 	Playlist   PlaylistModel
 
 	Uuid string
+
+        ArtistName string
+        TrackName string
 }
 
 type PlaylistStore struct {
@@ -91,7 +96,7 @@ func (p *PlaylistStore) FindByGuildAndName(guildId string, name string) (*Playli
 	return playlist, err
 }
 
-func (p *PlaylistStore) Append(guildId, playlistName, id string) error {
+func (p *PlaylistStore) Append(guildId, playlistName, id, trackName, artistName string) error {
 	playlist, err := p.FindByGuildAndName(guildId, playlistName)
 	if err != nil {
 		return err
@@ -100,6 +105,8 @@ func (p *PlaylistStore) Append(guildId, playlistName, id string) error {
 	t := &TrackModel{
 		PlaylistID: playlist.ID,
 		Uuid:       id,
+                TrackName:  trackName,
+                ArtistName: artistName,
 	}
 	return tryQuery(p.mysql.Save(t))
 
@@ -131,4 +138,34 @@ func (p *PlaylistStore) FindByID(id uint) (*PlaylistModel, error) {
 	playlist := new(PlaylistModel)
 	err := tryQuery(p.mysql.Where("id = ?", id).Find(playlist))
 	return playlist, err
+}
+func (p *PlaylistStore) Search(guildId, term string) ([]TrackModel, error) {
+        var playlists []uint
+        err := tryQuery(p.mysql.Model(&PlaylistModel{}).Where("guild_id = ?", guildId).Pluck("id", &playlists))
+        if err != nil {
+                return nil, err 
+        }
+        var ts []TrackModel
+        err = tryQuery(p.mysql.Model(&TrackModel{}).
+                Where("playlist_id IN ?", playlists).
+                Where("artist_name LIKE ?", like(term)).
+                Or("track_name LIKE ?", like(term)).
+                Find(&ts),
+        )
+        return ts, err
+}
+
+func like(term string) string {
+        return strings.Join([]string{"%", term, "%"}, "")
+}
+
+func (t TrackModel) String() string {
+        return strings.Join([]string{
+                strconv.FormatUint(uint64(t.ID), 10),
+                ") **",
+                t.ArtistName,
+                "** - **",
+                t.TrackName,
+                "**",
+        }, "")
 }
